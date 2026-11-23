@@ -22,6 +22,7 @@ export function startGame(): void {
     relY: number, relZ: number
     drawX: boolean, drawY: boolean, drawZ: boolean
   };
+  type point2B = { x: number, y: number, b: boolean };
   let currentDraw: block7 = {
     x1: 0, y1: 0, b1: false,
     x2: 0, y2: 0, b2: false,
@@ -40,10 +41,10 @@ export function startGame(): void {
   };
   let blocks: block[] = [
     { x1: 100, y1: 100, z1: 100, x2: 10, y2: 10, z2: 10 },
-    // { x1: 250, y1: 100, z1: 100, x2: 160, y2: 10, z2: 10 },
-    // { x1: 100, y1: 250, z1: 100, x2: 10, y2: 160, z2: 10 },
-    // { x1: 250, y1: 250, z1: 180, x2: 160, y2: 160, z2: 10 },
-    // { x1: 400, y1: 180, z1: 60, x2: 310, y2: 40, z2: 10 }
+    { x1: 250, y1: 100, z1: 100, x2: 160, y2: 10, z2: 10 },
+    { x1: 100, y1: 250, z1: 100, x2: 10, y2: 160, z2: 10 },
+    { x1: 250, y1: 250, z1: 180, x2: 160, y2: 160, z2: 10 },
+    { x1: 400, y1: 180, z1: 60, x2: 310, y2: 40, z2: 10 }
   ];
 
   const pi = Math.PI;
@@ -55,24 +56,99 @@ export function startGame(): void {
   let drawing: block7[] = [];
   const scale = 400;
 
-  let renderWithDot = 2;
+  let renderWithDot = 0;
+  let fixBehind = false;
   let currentPoint: point3;
   let temp: point3;
   let distance: number;
 
-  function polygon(points: point2[]): void {
+  function drawCubeFace(points: point2B[]): void {
     if(points.length < 3) return;
-    ctx.beginPath();
-    ctx.moveTo(canvas.width / 2 + points[0].x * scale, canvas.height / 2 + points[0].y * scale)
-    for (let i = 0; i < points.length; i++) {
-      const point = {
-        x: canvas.width / 2 + points[i].x * scale,
-        y: canvas.height / 2 + points[i].y * scale
-      };
-      ctx.lineTo(point.x, point.y);
+    let pointsBehind = 0;
+    let pointsBefore = 0;
+    let startedWithFront = false;
+    let newPoints: point2[] = [];
+    if(fixBehind) {
+
+      for (let i = 0; i < points.length; i++) {
+        if (pointsBefore > 0) {
+          newPoints.splice(i - pointsBefore, 0, {x: points[i].x, y: points[i].y});
+          if(points[i].b) {
+            pointsBehind++;
+          }
+        }
+        else {
+          newPoints.push({x: points[i].x, y: points[i].y});
+          pointsBefore--;
+          if(points[i].b) {
+            pointsBehind++;
+            startedWithFront = false;
+          }
+          else {
+            if(i == 0) startedWithFront = true;
+
+          }
+          if(points[i + 1]) if(points[i].b && !points[i + 1].b) pointsBefore = -pointsBefore;
+
+        }
+      }
+
     }
+    if(pointsBehind === 4) return;
+    if(pointsBehind === 3) {
+      ctx.beginPath();
+      const point0 = {x: canvas.width / 2 + newPoints[0].x * scale, y: canvas.height / 2 + newPoints[0].y * scale};
+      const point1 = {x: canvas.width / 2 + newPoints[1].x * scale, y: canvas.height / 2 + newPoints[1].y * scale};
+      const point2 = {x: canvas.width / 2 + newPoints[3].x * scale, y: canvas.height / 2 + newPoints[3].y * scale};
+      ctx.moveTo(point0.x, point0.y);
+      ctx.lineTo(2 * point0.x - point1.x, 2 * point0.y - point1.y);
+
+      ctx.lineTo(2 * point0.x - point2.x, 2 * point0.y - point2.y);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    if(pointsBehind == 2) {
+      ctx.beginPath();
+      const point0 = {x: canvas.width / 2 + newPoints[0].x * scale, y: canvas.height / 2 + newPoints[0].y * scale};
+      const point1 = {x: canvas.width / 2 + newPoints[1].x * scale, y: canvas.height / 2 + newPoints[1].y * scale};
+      const point2 = {x: canvas.width / 2 + newPoints[2].x * scale, y: canvas.height / 2 + newPoints[2].y * scale};
+      const point3 = {x: canvas.width / 2 + newPoints[3].x * scale, y: canvas.height / 2 + newPoints[3].y * scale};
+      ctx.moveTo(point0.x, point0.y);
+      ctx.lineTo(point1.x, point1.y);
+      ctx.lineTo(2 * point1.x - point2.x, 2 * point1.y - point2.y);
+      ctx.lineTo(2 * point0.x - point3.x, 2 * point0.y - point3.y);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    if(pointsBehind == 1) {
+    ctx.beginPath();
+    const point0 = {x: canvas.width / 2 + newPoints[0].x * scale, y: canvas.height / 2 + newPoints[0].y * scale};
+    const point1 = {x: canvas.width / 2 + newPoints[1].x * scale, y: canvas.height / 2 + newPoints[1].y * scale};
+    const point2 = {x: canvas.width / 2 + newPoints[2].x * scale, y: canvas.height / 2 + newPoints[2].y * scale};
+    const point3 = {x: canvas.width / 2 + newPoints[3].x * scale, y: canvas.height / 2 + newPoints[3].y * scale};
+    ctx.moveTo(point0.x, point0.y);
+    ctx.lineTo(point1.x, point1.y);
+    ctx.lineTo(point2.x, point2.y);
+    ctx.lineTo(2 * point2.x - point3.x, 2 * point2.y - point3.y);
+    ctx.lineTo(2 * point0.x - point3.x, 2 * point0.y - point3.y);
     ctx.closePath();
     ctx.fill();
+    } if(pointsBehind == 0) {
+      ctx.beginPath();
+
+      if (!points[0].b) ctx.moveTo(canvas.width / 2 + points[0].x * scale, canvas.height / 2 + points[0].y * scale)
+      for (let i = 0; i < points.length; i++) {
+        const point = {
+          x: canvas.width / 2 + points[i].x * scale,
+          y: canvas.height / 2 + points[i].y * scale
+        };
+        ctx.lineTo(point.x, point.y);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
   }
 
 
@@ -80,7 +156,7 @@ export function startGame(): void {
     if (event.repeat) return; // Ignore repeats while held
 
     if (event.key === 'f') {
-      if(keys.has('f')) renderWithDot = (renderWithDot + 1) % 2;
+      if(keys.has('f')) fixBehind = !fixBehind;
     }
   });
 
@@ -149,6 +225,7 @@ export function startGame(): void {
         let behind = false;
 
         for (let i = 0; i < 7; i++) {
+          behind = false;
           // The bits of i pick F or D per axis. This matches your x1..x7 order, and x8 = DDD.
           const a = (i >> 2) & 1, b = (i >> 1) & 1, c = i & 1;
           const depth = dX[a] + dY[b] + dZ[c];
@@ -162,7 +239,7 @@ export function startGame(): void {
           const yKey = `y${i + 1}` as
               'y1' | 'y2' | 'y3' | 'y4' | 'y5' | 'y6' | 'y7';
 
-          const bKey = `y${i + 1}` as
+          const bKey = `b${i + 1}` as
               'b1' | 'b2' | 'b3' | 'b4' | 'b5' | 'b6' | 'b7';
 
 
@@ -243,33 +320,33 @@ export function startGame(): void {
       // X face: all four points use pointF.x
       if (!draw.drawX) {
         ctx.fillStyle = `rgb(0, 0, ${Math.abs(cx) * 255})`;
-        polygon([
-          {x: draw.x1, y: draw.y1},
-          {x: draw.x2, y: draw.y2},
-          {x: draw.x4, y: draw.y4},
-          {x: draw.x3, y: draw.y3}
+        drawCubeFace([
+          {x: draw.x1, y: draw.y1, b: draw.b1},
+          {x: draw.x2, y: draw.y2, b: draw.b2},
+          {x: draw.x4, y: draw.y4, b: draw.b4},
+          {x: draw.x3, y: draw.y3, b: draw.b3}
         ]);
       }
 
 // Y face: all four points use pointF.y
       if (!draw.drawY) {
         ctx.fillStyle = `rgb(0, 0, ${Math.abs(cy) * 255})`;
-        polygon([
-          {x: draw.x1, y: draw.y1},
-          {x: draw.x2, y: draw.y2},
-          {x: draw.x6, y: draw.y6},
-          {x: draw.x5, y: draw.y5}
+        drawCubeFace([
+          {x: draw.x1, y: draw.y1, b: draw.b1},
+          {x: draw.x2, y: draw.y2, b: draw.b2},
+          {x: draw.x6, y: draw.y6, b: draw.b6},
+          {x: draw.x5, y: draw.y5, b: draw.b5}
         ]);
       }
 
 // Z face: all four points use pointF.z
       if (!draw.drawZ) {
         ctx.fillStyle = `rgb(0, 0, ${Math.abs(cz) * 255})`;
-        polygon([
-          {x: draw.x1, y: draw.y1},
-          {x: draw.x3, y: draw.y3},
-          {x: draw.x7, y: draw.y7},
-          {x: draw.x5, y: draw.y5}
+        drawCubeFace([
+          {x: draw.x1, y: draw.y1, b: draw.b1},
+          {x: draw.x3, y: draw.y3, b: draw.b3},
+          {x: draw.x7, y: draw.y7, b: draw.b7},
+          {x: draw.x5, y: draw.y5, b: draw.b5}
         ]);
       }
 
