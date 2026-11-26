@@ -5,7 +5,7 @@ import { canvas, ctx, keys, mouse, startLoop } from './backend';
 
 
 export function startGame(): void {
-  let player = { x: 0, y: 0, z: 0};
+  let player = { x: 0, y: 0, z: 0, velX: 0, velY: 0, velZ: 0, width: 10, depth: 10, height: 30, speed: 70, jump: 100};
   let camera = { a: 0, b: 0 }
   type block = { x1: number, y1: number, z1: number, x2: number, y2: number, z2: number};
   type point2 = { x: number, y: number };
@@ -40,8 +40,8 @@ export function startGame(): void {
     drawZ: false
   };
   let blocks: block[] = [
-    { x1: 100, y1: 100, z1: 100, x2: 10, y2: 10, z2: 10 },
-    { x1: 250, y1: 100, z1: 100, x2: 160, y2: 10, z2: 10 },
+    { x1: 100, y1: 100, z1: 100, x2: -100, y2: -100, z2: 10 },
+    { x1: 250, y1: 100, z1: 100, x2: 155, y2: 10, z2: 10 },
     { x1: 100, y1: 250, z1: 100, x2: 10, y2: 160, z2: 10 },
     { x1: 250, y1: 250, z1: 180, x2: 160, y2: 160, z2: 10 },
     { x1: 400, y1: 180, z1: 60, x2: 310, y2: 40, z2: 10 }
@@ -56,11 +56,36 @@ export function startGame(): void {
   let drawing: block7[] = [];
   const scale = 400;
 
+  const reflectionStrength = 50;
+
   let renderWithDot = 0;
-  let fixBehind = false;
+  let fixBehind = true;
   let currentPoint: point3;
-  let temp: point3;
+  let temp: point3 = {x: 0, y: 0, z: 0};
   let distance: number;
+  let flying = false;
+  let spaceWasDown = 0;
+  let gravity = 300;
+  let block: block;
+  let ground = false;
+
+
+  for(let i = 0; i < blocks.length; i++) {
+    block = blocks[i];
+    if(block.x1 > block.x2) {
+      temp.x = block.x1;
+      block.x1 = block.x2;
+      block.x2 = temp.x;
+    } if(block.y1 > block.y2) {
+      temp.y = block.y1;
+      block.y1 = block.y2;
+      block.y2 = temp.y;
+    } if(block.z1 > block.z2) {
+      temp.z = block.z1;
+      block.z1 = block.z2;
+      block.z2 = temp.z;
+    }
+  }
 
   function drawCubeFace(points: point2B[]): void {
     if(points.length < 3) return;
@@ -101,11 +126,12 @@ export function startGame(): void {
       const point1 = {x: canvas.width / 2 + newPoints[1].x * scale, y: canvas.height / 2 + newPoints[1].y * scale};
       const point2 = {x: canvas.width / 2 + newPoints[3].x * scale, y: canvas.height / 2 + newPoints[3].y * scale};
       ctx.moveTo(point0.x, point0.y);
-      ctx.lineTo(2 * point0.x - point1.x, 2 * point0.y - point1.y);
+      ctx.lineTo(reflectionStrength * point0.x - reflectionStrength * point1.x + point1.x, reflectionStrength * point0.y - reflectionStrength * point1.y + point1.y);
 
-      ctx.lineTo(2 * point0.x - point2.x, 2 * point0.y - point2.y);
+      ctx.lineTo(reflectionStrength * point0.x - reflectionStrength * point2.x + point2.x, reflectionStrength * point0.y - reflectionStrength * point2.y + point2.y);
       ctx.closePath();
       ctx.fill();
+      ctx.stroke();
     }
 
     if(pointsBehind == 2) {
@@ -116,10 +142,11 @@ export function startGame(): void {
       const point3 = {x: canvas.width / 2 + newPoints[3].x * scale, y: canvas.height / 2 + newPoints[3].y * scale};
       ctx.moveTo(point0.x, point0.y);
       ctx.lineTo(point1.x, point1.y);
-      ctx.lineTo(2 * point1.x - point2.x, 2 * point1.y - point2.y);
-      ctx.lineTo(2 * point0.x - point3.x, 2 * point0.y - point3.y);
+      ctx.lineTo(reflectionStrength * point1.x - reflectionStrength * point2.x + point2.x, reflectionStrength * point1.y - reflectionStrength * point2.y + point2.y);
+      ctx.lineTo(reflectionStrength * point0.x - reflectionStrength * point3.x + point3.x, reflectionStrength * point0.y - reflectionStrength * point3.y + point3.y);
       ctx.closePath();
       ctx.fill();
+      ctx.stroke();
     }
 
     if(pointsBehind == 1) {
@@ -131,10 +158,11 @@ export function startGame(): void {
     ctx.moveTo(point0.x, point0.y);
     ctx.lineTo(point1.x, point1.y);
     ctx.lineTo(point2.x, point2.y);
-    ctx.lineTo(2 * point2.x - point3.x, 2 * point2.y - point3.y);
-    ctx.lineTo(2 * point0.x - point3.x, 2 * point0.y - point3.y);
+    ctx.lineTo(reflectionStrength * point2.x - reflectionStrength * point3.x + point3.x, reflectionStrength * point2.y - reflectionStrength * point3.y + point3.y);
+    ctx.lineTo(reflectionStrength * point0.x - reflectionStrength * point3.x + point3.x, reflectionStrength * point0.y - reflectionStrength * point3.y + point3.y);
     ctx.closePath();
     ctx.fill();
+    ctx.stroke();
     } if(pointsBehind == 0) {
       ctx.beginPath();
 
@@ -148,50 +176,170 @@ export function startGame(): void {
       }
       ctx.closePath();
       ctx.fill();
+      ctx.stroke();
     }
   }
 
 
   window.addEventListener('keydown', (event) => {
     if (event.repeat) return; // Ignore repeats while held
-
-    if (event.key === 'f') {
-      if(keys.has('f')) fixBehind = !fixBehind;
+    if(event.key === ' ') {
+      spaceWasDown += 30;
+      if (spaceWasDown > 30) {
+        flying = !flying;
+        if (flying) player.velZ = 0;
+        spaceWasDown = 0;
+      }
     }
+      if(event.key === 'r') {
+        player.x = 0;
+        player.y = 0;
+        player.z = 0;
+        ground = false;
+        player.velX = 0;
+        player.velY = 0;
+        player.velZ = 0;
+        camera.a = 0;
+        camera.b = 0;
+      }
   });
 
+
+  function collideBlock(x1: number, y1: number, z1: number, x2: number, y2: number, z2: number) {
+    const playerTop = z2 - (player.z - player.height / 2);
+    const playerBottom = player.z + player.height / 2 - z1;
+    const playerFront = y2 - (player.y - player.depth / 2);
+    const playerBack = player.y + player.depth / 2 - y1;
+    const playerLeft = x2 - (player.x - player.width / 2);
+    const playerRight = player.x + player.width / 2 - x1;
+    if(playerLeft > 0 && playerRight > 0  && playerBack > 0 && playerFront > 0 && playerBottom > 0 && playerTop > 0) {
+      const min = Math.min(playerLeft, playerRight, playerBack, playerFront, playerBottom, playerTop);
+      if(min == playerTop) return 1;
+      if(min == playerFront) return 2;
+      if(min == playerRight) return 3;
+      if(min == playerLeft) return 4;
+      if(min == playerBack) return 5;
+      if(min == playerBottom) return 6;
+    } else return 0;
+  }
 
 
 
   const frame = (deltaTime: number): void => {
     ctx.resetTransform();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawing = [];
-    drawing.length = 0;
+
+
+    //--------------------------------------------PHYSICS--------------------------------------------------------------\
+
+    player.x += player.velX * deltaTime;
+    player.y += player.velY * deltaTime;
+    player.z += player.velZ * deltaTime;
+    if(!flying) player.velZ += gravity * deltaTime;
+
 
     camera.a = Math.min(Math.max(camera.a + mouse.deltaY * sensitivity, -pi/2), pi/2)
     camera.b = ((camera.b + mouse.deltaX * sensitivity) % (2 * pi) + 2 * pi) % (2 * pi);
 
+
+
+    player.velX = 0;
+    player.velY = 0;
+    if(flying) {
+      player.velZ = 0;
+    }
+
+    //COLLISION
+    for(let i = 0; i < blocks.length; i++) {
+      block = blocks[i];
+    const collision = collideBlock(block.x1, block.y1, block.z1, block.x2, block.y2, block.z2);
+    if (collision) {
+      if (collision == 1)  {
+        player.velZ = 0;
+        player.z = block.z2 + player.height / 2
+
+      }
+      if (collision == 2) {
+        player.y = block.y2 + player.width / 2
+        player.velY = 0;
+      }
+      if (collision == 3) {
+        player.x = block.x1 - player.width / 2
+        player.velX = 0;
+      }
+      if (collision == 4) {
+        player.x = block.x2 + player.width / 2
+        player.velX = 0;
+      }
+      if (collision == 5) {
+        player.y = block.y1 - player.depth / 2
+        player.velY = 0;
+      }
+      if (collision == 6) {
+        player.velZ = 0;
+        player.z = block.z1 - player.height / 2
+        ground = true;
+      }
+    }
+  }
+
     if(keys.has('w')) {
-      player.x += Math.cos(camera.b) * deltaTime * 100;
-      player.y += Math.sin(camera.b) * deltaTime * 100;
+      player.velX += Math.cos(camera.b) * player.speed;
+      player.velY += Math.sin(camera.b) * player.speed;
     }
     if(keys.has('s')) {
-      player.x -= Math.cos(camera.b) * deltaTime * 100;
-      player.y -= Math.sin(camera.b) * deltaTime * 100;
+      player.velX += -Math.cos(camera.b) * player.speed;
+      player.velY += -Math.sin(camera.b) * player.speed;
     }
     if(keys.has('a')) {
-      player.x += Math.sin(camera.b) * deltaTime * 100;
-      player.y -= Math.cos(camera.b) * deltaTime * 100;
+      player.velX += Math.sin(camera.b) * player.speed;
+      player.velY += -Math.cos(camera.b) * player.speed;
     }
     if(keys.has('d')) {
-      player.x -= Math.sin(camera.b) * deltaTime * 100;
-      player.y += Math.cos(camera.b) * deltaTime * 100;
+      player.velX += -Math.sin(camera.b) * player.speed;
+      player.velY += Math.cos(camera.b) * player.speed;
     }
-    if(keys.has('shift')) player.z += deltaTime * 100;
-    if(keys.has(' ')) player.z -= deltaTime * 100;
+    if(flying) {
+      if (keys.has('shift')) player.velZ += 100;
+    }
+    if(keys.has(' ')) {
+      if(ground) {
+        player.velZ -= player.jump;
+        ground = false;
+      } if(flying) {
+        player.velZ -= 100;
+      }
+    }
+    if(spaceWasDown > 0) {
+      spaceWasDown -= deltaTime * 60;
+    }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    //------------------------------------------RENDERING--------------------------------------------------------------
+
+
+
+    drawing = [];
+    drawing.length = 0;
 
     focus = {x: Math.cos(camera.b) * Math.cos(camera.a), y: Math.sin(camera.b) * Math.cos(camera.a), z: Math.sin(camera.a)};
     focusX = {x: -Math.sin(camera.b), y: Math.cos(camera.b), z: 0 }
@@ -355,6 +503,15 @@ export function startGame(): void {
     ctx.fillStyle = 'black';
     ctx.font = '16px sans-serif';
     ctx.fillText(`FPS: ${fps.toFixed(1)}`, 10, 20);
+    if(ground) {
+      ctx.fillText(`Grounded`, 10, 40);
+    }
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'white';
+    ctx.font = '50px sans-serif';
+    ctx.fillText('+', canvas.width/2,canvas.height/2);
+    ctx.restore();
   }
 
 
